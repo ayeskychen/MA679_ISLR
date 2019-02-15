@@ -1,0 +1,226 @@
+---
+title: "ISLRCh5&6"
+author: "Sky Liu"
+date: "2/14/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("ISLR")
+library("boot")
+library("leaps")
+library("glmnet")
+```
+
+## 5.7.8
+
+### part a
+
+```{r}
+
+set.seed(214)
+
+x <- rnorm(100)
+y <- x - 2 * x^2 + rnorm(100)
+```
+n=100 and p=2. The equation form of the model is $y=x-2x_i^2+\epsilon$
+
+### part b 
+```{r}
+plot(x, y)
+```
+
+The simulated data peaks at x = 0.25, which is also the maximum of the first derivative of the model equation
+
+
+### part c
+
+```{r}
+set.seed(214)
+DF <- data.frame(y = y, x = x)
+m1 <- glm(y ~ x, data = DF)
+cv.err <- cv.glm(DF, m1)
+e1<-cv.err$delta[1]
+
+
+```
+
+```{r}
+m2 <- glm(y ~ x + I(x^2), data = DF)
+cv.err <- cv.glm(DF, m2)
+e2<-cv.err$delta[1]
+```
+
+```{r}
+
+m3 <- glm(y ~ x + I(x^2) + I(x^3), data = DF)
+cv.err <- cv.glm(DF, m3)
+e3<-cv.err$delta[1]
+```
+
+
+```{r}
+m4 <- glm(y ~ x + I(x^2) + I(x^3) + I(x^4), data = DF)
+cv.err <- cv.glm(DF, m4)
+e4<-cv.err$delta[1]
+e1
+e2
+e3
+e4
+```
+
+## part d
+
+```{r}
+
+set.seed(211)
+
+DF <- data.frame(y = y, x = x)
+m1 <- glm(y ~ x, data = DF)
+cv.err <- cv.glm(DF, m1)
+e1<-cv.err$delta[1]
+
+
+```
+
+```{r}
+m2 <- glm(y ~ x + I(x^2), data = DF)
+cv.err <- cv.glm(DF, m2)
+e2<-cv.err$delta[1]
+```
+
+```{r}
+
+m3 <- glm(y ~ x + I(x^2) + I(x^3), data = DF)
+cv.err <- cv.glm(DF, m3)
+e3<-cv.err$delta[1]
+```
+
+
+```{r}
+m4 <- glm(y ~ x + I(x^2) + I(x^3) + I(x^4), data = DF)
+cv.err <- cv.glm(DF, m4)
+e4<-cv.err$delta[1]
+e1
+e2
+e3
+e4
+```
+
+The results are the same becasue it evaluates only one single observation.
+
+### part e
+
+The second model has the smallest error as expected because the quadratic polynomial matchs with the original data.
+
+```{r}
+summary(m2)
+```
+
+Both the linear and quadratic terms has small p value.
+
+## 6.8.2
+
+### part a - lasso
+iii. Less flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance.
+
+Lasso constraints non-zero coefficient estimates to zeros, that means an increase in bias (due to the reduced number of coefficient estimates) and a decrease in variance. If the increase in bias is less than the decrease in variance , the prediction accuracy will be improved by using lasso comparing to least squares method.
+
+### part b - ridge regression
+iii. Less flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance.
+
+Same as part a
+
+
+### part c - non-linear methods
+ii. More flexible and hence will give improved prediction accuracy when its increase in variance is less than its decrease in bias.
+
+
+## 6.8.10
+### part a
+```{r}
+set.seed(192)
+n = 1000
+p = 20
+x = matrix(rnorm(n * p), n, p)
+betas = rnorm(p)
+zerob = c(3,4,7,8,11,12,13,19,20)
+betas[zerob] = 0
+
+e = rnorm(p)
+y = x %*% betas + e
+
+```
+
+### part b 
+```{r}
+train = sample(seq(1000), 100, replace = FALSE)
+y_train = y[train, ]
+y_test = y[-train, ]
+x_train = x[train, ]
+x_test = x[-train, ]
+```
+
+### part c
+```{r}
+
+m_full = regsubsets(y ~ ., data = data.frame(x = x_train, y = y_train),nvmax = p)
+val_errors = rep(NA, p)
+x_cols = colnames(x, do.NULL = FALSE, prefix = "x.")
+for (i in 1:p) {
+    coei = coef(m_full, id = i)
+    pred = as.matrix(x_train[, x_cols %in% names(coei)]) %*% coei[names(coei) %in% 
+        x_cols]
+    val_errors[i] = mean((y_train - pred)^2)
+}
+plot(val_errors, ylab = "Training MSE")
+```
+
+```{r}
+val_errors1 = rep(NA, p)
+for (i in 1:p) {
+    coe = coef(m_full, id = i)
+    pred = as.matrix(x_test[, x_cols %in% names(coe)]) %*% coe[names(coe) %in% 
+        x_cols]
+    val_errors1[i] = mean((y_test - pred)^2)
+}
+plot(val_errors1, ylab = "Test MSE")
+```
+
+### part e
+
+```{r}
+
+which.min(val_errors1)
+```
+
+Model with 9+1 terms has the smallest MSE, but from the plot we can see that, from the 9th to the 20th, the MSE are about the same, while the rest have large variance in MSE. Thus, this model is not a very good fit, maybe using more data to train the model will provide a better result.
+
+### part f
+
+model 9 coefficients:
+```{r}
+
+coef(m_full,id=9)
+```
+
+we set 3,4,7,8,11,12,13,19,20 as zero at the begining. The 6th, 15 th does not match, others are fine. 
+
+### part g
+```{r}
+
+val_errors2 = rep(NA, p)
+x1 = rep(NA, p)
+y1 = rep(NA, p)
+for (i in 1:p) {
+    coe = coef(m_full, id = i)
+    x1[i] = length(coe) - 1
+    y1[i] = sqrt(sum((betas[x_cols %in% names(coe)] - coe[names(coe) %in% x_cols])^2) + 
+        sum(betas[!(x_cols %in% names(coe))])^2)
+}
+plot(x = x1, y = y1)
+which.min(y1)
+```
+
+The model with 5+1 terms is the best model.Still the increase of parameters leads to the increase of variance, that means larger gap between true betas and model betas.
