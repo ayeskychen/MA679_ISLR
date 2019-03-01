@@ -1,0 +1,245 @@
+---
+title: "ISLR_CH7"
+author: "Sky Liu"
+date: "2/28/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(
+  "leaps",
+  "boot",
+  "MASS",
+  "gam",
+  "splines",
+  "ISLR"
+)
+
+```
+
+## 7.9.3
+Given ${\hat{\beta _0}} = 1, {\hat{\beta_1}} = 1$ and ${\hat{\beta_2}} = -2$, we obtain:
+
+$$
+\hat Y = 1 + X - 2{{(X - 1)}^2}I(X \ge 1)\\
+ = \left\{ {\begin{array}{*{20}{l}}
+1 + X,X < 1\\
+ - 1 + 5X - 2{X^2},X \ge 1
+\end{array}} \right.
+$$
+
+
+```{r}
+X <- seq(from = -2, to = 2, length.out = 500)
+
+Y <- 1 + X - 2 * (X - 1)^2 * (X >= 1)
+
+plot(X, Y, type = "l");abline(v = 1, col = "red");points(0, 1,  col = "red", cex = 2, pch = 20)
+
+```
+
+The intercept is 1.
+When $X < 1$, the slope is 1, while when $X \ge 1$, the slope is $5 - 10X$.
+
+## 7.9.9
+
+### part a
+```{r}
+data("Boston")
+
+set.seed(799)
+lm1 = lm(nox ~ poly(dis, 3), data = Boston)
+summary(lm1)
+dislims <- range(Boston$dis)
+dis.grid <- seq(dislims[1], dislims[2], 0.1)
+dis_range <- range(Boston$dis)
+dis_samples <- seq(from = dis_range[1], to = dis_range[2], length.out = 100)
+y_hat <- predict(lm1, newdata = list(dis = dis_samples))
+
+plot(Boston$dis, Boston$nox, xlab = "dis", ylab = "nox", main = "cubic polynomial regression fit");lines(dis_samples, y_hat, col = "red")
+```
+
+The plot shows that the curve looks like a good fit.
+From the model output we could also see that all three polynomial terms are significant.
+
+### part b
+```{r}
+rss = rep(NA, 10)
+for (i in 1:10) {
+    lm1 = lm(nox ~ poly(dis, i), data = Boston)
+    rss[i] = sum(lm1$residuals^2)
+}
+rss
+plot(1:10, rss, xlab = "Degree", ylab = "CV error", type = "l", pch = 20, 
+    lwd = 2)
+```
+
+The plot shows RSS decreases as the degree of polynomial increases.
+
+### part c
+```{r}
+set.seed(799)
+cv.e = rep(NA, 10)
+for (i in 1:10) {
+    lm2 = glm(nox ~ poly(dis, i), data = Boston)
+    cv.e[i] = cv.glm(Boston, lm2, K = 10)$delta[2]
+}
+cv.e
+plot(1:10, cv.e, xlab = "Degree", ylab = "CV error", type = "l", pch = 20, 
+    lwd = 2)
+```
+
+The plot shows 4 is the best polynomial degree.
+
+### part d
+```{r}
+lm3 <-lm(nox ~ bs(dis,df = 4),data = Boston)
+summary(lm3)
+
+
+dim(bs(Boston$dis,df = 4))
+attr(bs(Boston$dis,df = 4),"knots")
+pred2 <- predict(lm3, newdata = list(dis = dis.grid), se = T)
+plot(x = Boston$dis, y = Boston$nox, cex = 0.2, col = "grey");lines(dis.grid,pred2$fit, lwd = 2);lines(dis.grid, pred2$fit + 2*pred2$se);lines(dis.grid,pred2$fit - 2*pred2$se)
+
+
+```
+
+### part e
+
+```{r}
+set.seed(7995)
+rss = rep(NA, 7)
+for (i in 2:9) {
+    lm1 = lm(nox ~ poly(dis, i), data = Boston)
+    rss[i] = sum(lm1$residuals^2)
+}
+rss
+plot(1:9, rss, xlab = "Degree", ylab = "CV error", type = "l", pch = 20, 
+    lwd = 2)
+```
+
+The plot shows RSS decreases as the degree of polynomial increases.
+
+### part f
+```{r}
+cv.e = rep(NA, 7)
+for (i in 2:9) {
+    lm1 = glm(nox ~ poly(dis, i), data = Boston)
+    cv.e[i] = cv.glm(Boston, lm1, K = 10)$delta[2]
+}
+cv.e
+plot(1:9, cv.e,type = "l")
+
+```
+
+When degree of freedom is 4, we obtain the min cv error.
+
+## 7.9.10
+### part a
+```{r}
+attach(College)
+train <- sample(1:nrow(College), nrow(College)/2)
+train.c <- College[train,]
+test.c <- College[-train,]
+f1_reg <- regsubsets(Outstate~., data = train.c, nvmax = 17, method = "forward")
+f1_summary <- summary(f1_reg)
+plot(f1_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted R2", 
+    type = "l", ylim = c(0.4, 0.84))
+```
+
+The model with 6 variables seems to be the best fit. The fitting terms are:
+```{r}
+f1 = regsubsets(Outstate ~ ., data = College, method = "forward")
+coefi = coef(f1, id = 6)
+names(coefi)
+```
+
+
+### part b
+```{r}
+
+f1_gam = gam(Outstate ~ Private + s(Room.Board, df = 3) + s(PhD, df = 3) + 
+    s(perc.alumni, df = 3) + s(Expend, df = 3) + s(Grad.Rate, df = 3), data = train.c)
+par(mfrow = c(2, 3))
+plot(f1_gam, se = T, col = "blue")
+
+```
+
+### part c
+
+```{r}
+pre_gam <- predict(f1_gam, newdata = test.c)
+er_gam <- mean((test.c$Outstate - pre_gam)^2)
+SS_tot <- mean((test.c$Outstate - mean(test.c$Outstate))^2)
+rss <- 1- er_gam/SS_tot
+rss
+```
+
+Using GAM, we obtained r square 0.80, which is better than regression fit.
+
+### part d
+```{r}
+summary(f1_gam)
+```
+
+
+## 7.9.11
+### part a
+```{r}
+set.seed(7911)
+X1 = rnorm(100)
+X2 = rnorm(100)
+eps = rnorm(100, sd = 0.1)
+Y = -2.1 + 1.3 * X1 + 0.54 * X2 + eps
+```
+
+### part b
+```{r}
+beta0 <- rep(NA,1000)
+beta1 <- rep(NA,1000)
+beta2 <- rep(NA,1000)
+beta1[1] <- 7
+```
+
+### part c-e
+```{r}
+for(i in 1:1000){
+  a <- Y - beta1[i]*X1 
+  lm4<- lm(a~X2)
+  beta2[i] <- lm4$coeff[2]
+  b <- Y - beta2[i]*X2
+  fm5 <- lm(b~X1)
+  if(i < 1000){
+  beta1[i+1] <- fm5$coef[2]
+  }
+  beta0[i] <- fm5$coef[1]
+}
+plot(1:1000, beta0, type = "l", xlab = "iteration", ylab = "betas", ylim = c(-5, 5), col = "green");lines(1:1000, beta1, col = "red");lines(1:1000, beta2, col = "blue");legend("center", c("beta0", "beta1", "beta2"), lty = 1, col = c("green", "red", "blue"))
+```
+
+After one iteration, we obtain
+beta0 is -2.075059
+beta1 is 1.311948
+beta2 is 0.5428701
+
+### part f
+```{r}
+lm.fit = lm(Y ~ X1 + X2)
+plot(1:1000, beta0, type = "l", xlab = "iteration", ylab = "betas", ylim = c(-2.2, 
+    1.6), col = "green",lty = "dashed",)
+lines(1:1000, beta1, col = "red",lty = "dashed",)
+lines(1:1000, beta2, col = "blue",lty = "dashed",)
+abline(h = lm.fit$coef[1],  lwd = 3, col = rgb(0, 0, 0, alpha = 0.4))
+abline(h = lm.fit$coef[2],  lwd = 3, col = rgb(0, 0, 0, alpha = 0.4))
+abline(h = lm.fit$coef[3],  lwd = 3, col = rgb(0, 0, 0, alpha = 0.4))
+legend("center", c("beta0", "beta1", "beta2", "multiple regression"), lty = c(2, 
+    2, 2, 1), col = c("green", "red", "blue", "black"))
+```
+
+The estimated multiple regression coefficients are shown with black lines, which match with the result from part e
+
+### part g
+
+When Y and X are linearly related, one backfitting iterations is required in order to obtain a ???good??? approximation to the multiple re- gression coefficient estimates.
