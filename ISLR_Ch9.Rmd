@@ -1,0 +1,381 @@
+---
+title: "ISLR_CH9"
+author: "Sky Liu"
+date: "3/21/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(
+  "leaps",
+  "boot",
+  "MASS",
+  "gam",
+  "splines",
+  "ISLR",
+  "randomForest",
+  "tree",
+  "gbm",
+  "e1071"
+)
+
+```
+
+
+
+
+
+
+## 9.7.3
+
+### part a 
+```{r}
+x1 = c(3, 2, 4, 1, 2, 4, 4)
+x2 = c(4, 2, 4, 4, 1, 3, 1)
+colors = c("red", "red", "red", "red", "blue", "blue", "blue")
+plot(x1, x2, col = colors, xlim = c(0, 5), ylim = c(0, 5))
+```
+
+### part b
+```{r}
+
+plot(x1, x2, col = colors, xlim = c(0, 5), ylim = c(0, 5))
+abline(-0.5, 1)
+```
+
+### part c
+
+$$-0.5 + X_1 - X_2 = 0.$$
+
+### part d
+```{r}
+plot(x1, x2, col = colors, xlim = c(0, 5), ylim = c(0, 5))
+abline(-0.5, 1)
+abline(-1, 1, lty = 2)
+abline(0, 1, lty = 2)
+```
+
+### part e
+```{r}
+plot(x1, x2, col = colors, xlim = c(0, 5), ylim = c(0, 5))
+abline(-0.5, 1)
+arrows(2, 1, 1.9, 1.4)
+arrows(2, 2, 2.1, 1.6)
+arrows(4, 4, 4.1, 3.6)
+arrows(4, 3, 3.9, 3.4)
+```
+
+### part f
+
+because it's outside of the margin.
+
+### part g
+
+```{r}
+plot(x1, x2, col = colors, xlim = c(0, 5), ylim = c(0, 5))
+abline(-0.75, 1)
+```
+
+$$-0.75 + X_1 - X_2 = 0.$$
+
+### h
+```{r}
+plot(x1, x2, col = colors, xlim = c(0, 5), ylim = c(0, 5))
+points(c(3),c(1), col = c("red"))
+```
+
+
+## 9.7.5
+
+### part a
+```{r}
+set.seed(3)
+x1 = runif(500) - 0.5
+x2 = runif(500) - 0.5
+y = 1 * (x1^2 - x2^2 > 0)
+```
+
+### part b
+
+```{R}
+plot(x1[y == 0], x2[y == 0], col = "red", xlab = "X1", ylab = "X2", pch = "+")
+points(x1[y == 1], x2[y == 1], col = "blue", pch = 4)
+```
+
+### part c
+```{r}
+lm_fit = glm(y ~ x1 + x2, family = binomial)
+summary(lm_fit)
+```
+
+
+### part d
+```{r}
+data = data.frame(x1 = x1, x2 = x2, y = y)
+lm_prob = predict(lm_fit, data, type = "response")
+# probability threshold = 0.53
+lm_pred = ifelse(lm_prob > 0.53, 1, 0)
+data_pos = data[lm_pred == 1, ]
+data_neg = data[lm_pred == 0, ]
+plot(data_pos$x1, data_pos$x2, col = "blue", xlab = "X1", ylab = "X2", pch = "+")
+points(data_neg$x1, data_neg$x2, col = "red", pch = 4)
+```
+
+### part e
+```{R}
+lm_fit = glm(y ~ poly(x1, 2) + poly(x2, 2) + I(x1 * x2), data = data, family = binomial)
+```
+
+
+### part f
+```{r}
+lm_prob = predict(lm_fit, data, type = "response")
+# probability threshold = 0.5
+lm_pred = ifelse(lm_prob > 0.5, 1, 0)
+data_pos = data[lm_pred == 1, ]
+data_neg = data[lm_pred == 0, ]
+plot(data_pos$x1, data_pos$x2, col = "blue", xlab = "X1", ylab = "X2", pch = "+")
+points(data_neg$x1, data_neg$x2, col = "red", pch = 4)
+```
+
+
+### part g
+```{R}
+svm_fit = svm(as.factor(y) ~ x1 + x2, data, kernel = "linear", cost = 0.1)
+svm_pred = predict(svm_fit, data)
+data_pos = data[svm_pred == 1, ]
+data_neg = data[svm_pred == 0, ]
+plot(data_pos$x1, data_pos$x2, col = "blue", xlab = "X1", ylab = "X2", pch = "+")
+points(data_neg$x1, data_neg$x2, col = "red", pch = 4)
+```
+
+### part h
+```{r}
+svm_fit = svm(as.factor(y) ~ x1 + x2, data, gamma = 1)
+svm_pred = predict(svm_fit, data)
+data_pos = data[svm_pred == 1, ]
+data_neg = data[svm_pred == 0, ]
+plot(data_pos$x1, data_pos$x2, col = "blue", xlab = "X1", ylab = "X2", pch = "+")
+points(data_neg$x1, data_neg$x2, col = "red", pch = 4)
+```
+
+# part i
+
+Logistic regression with non-interactions and SVMs with linear kernels fail to find the decision boundary.
+Logistic regression with interactions find a decision boundary that is very close to the real one. But finding the correct interactions might become a challenge. However, using radial basis kernels, and only change the parameter gamma, saves lots of effort and simple CV could accomplish that. Thus, SVMs with non-linear kernel is very useful to find a non-linear decision boundary.
+
+## 9.7.7
+
+### part a
+
+```{r}
+gas.med = median(Auto$mpg)
+new.var = ifelse(Auto$mpg > gas.med, 1, 0)
+Auto$mpglevel = as.factor(new.var)
+```
+
+### part b
+
+#### linear kernel
+```{r}
+set.seed(4)
+tune_out = tune(svm, mpglevel ~ ., data = Auto, kernel = "linear", ranges = list(cost = c(0.01, 
+    0.1, 1, 5, 10, 100)))
+summary(tune_out)
+```
+When cost = 1, the test MSE is the smallest.
+
+### part c
+
+#### polynomial kernal
+```{r}
+set.seed(5)
+tune_out = tune(svm, mpglevel ~ ., data = Auto, kernel = "polynomial", ranges = list(cost = c(0.1, 
+    1, 5, 10), degree = c(2, 3, 4)))
+summary(tune_out)
+
+```
+When cost = 10, degree = 2, the error is the smallest.
+
+### radial kernel
+```{r}
+set.seed(6)
+tune_out = tune(svm, mpglevel ~ ., data = Auto, kernel = "radial", ranges = list(cost = c(0.1, 
+    1, 5, 10), gamma = c(0.01, 0.1, 1, 5, 10, 100)))
+summary(tune_out)
+```
+
+When cost = 10, gamma = 0.1, the error is the smallest.
+
+### part d
+```{r}
+svm_linear = svm(mpglevel ~ ., data = Auto, kernel = "linear", cost = 1)
+svm_poly = svm(mpglevel ~ ., data = Auto, kernel = "polynomial", cost = 10, 
+    degree = 2)
+svm_radial = svm(mpglevel ~ ., data = Auto, kernel = "radial", cost = 10, gamma = 0.01)
+plotpairs = function(fit) {
+    for (name in names(Auto)[!(names(Auto) %in% c("mpg", "mpglevel", "name"))]) {
+        plot(fit, Auto, as.formula(paste("mpg~", name, sep = "")))
+    }
+}
+plotpairs(svm_linear)
+plotpairs(svm_poly)
+plotpairs(svm_radial)
+```
+
+
+## 9.7.8
+
+### part a
+```{r}
+set.seed(7)
+train = sample(dim(OJ)[1], 800)
+OJ_train = OJ[train, ]
+OJ_test = OJ[-train, ]
+```
+
+### part b
+```{r}
+svm_linear = svm(Purchase ~ ., kernel = "linear", data = OJ_train, cost = 0.01)
+summary(svm_linear)
+```
+
+Support vector classifier creates 443 support vectors from  800 training points. In the rest of points, 223 belong to level CH and 220 belong to level MM.
+
+### part c
+```{r}
+train_pred = predict(svm_linear, OJ_train)
+table(OJ_train$Purchase, train_pred)
+(59+83)/(426+232+59+83)
+```
+The training data error rate is 17.75%
+```{r}
+test_pred = predict(svm_linear, OJ_test)
+table(OJ_test$Purchase, test_pred)
+(17+26)/(151+17+26+76)
+```
+
+The test data error rate is 16%
+
+### part d
+```{r}
+set.seed(8)
+tune_out = tune(svm, Purchase ~ ., data = OJ_train, kernel = "linear", ranges = list(cost = 10^seq(-2,1, by = 0.25)))
+summary(tune_out)
+```
+The optimal cost is 3.1623
+
+### part e
+```{r}
+svm_linear = svm(Purchase ~ ., kernel = "linear", data = OJ_train, cost = tune_out$best.parameters$cost)
+train_pred = predict(svm_linear, OJ_train)
+table(OJ_train$Purchase, train_pred)
+(60+71)/(60+71+425+244)
+```
+
+The training error rate after tuning is 16.375%
+
+```{r}
+test_pred = predict(svm_linear, OJ_test)
+table(OJ_test$Purchase, test_pred)
+(16+26)/(16+26+152+76)
+```
+
+The test error rate after tuing is 15.56%
+
+### part f
+```{r}
+set.seed(9)
+svm_radial = svm(Purchase ~ ., data = OJ_train, kernel = "radial")
+summary(svm_radial)
+```
+
+Support vector classifier with radial kernel creates 368 support vectors from  800 training points. In the rest of points, 183 belong to level CH and 185 belong to level MM.
+
+```{r}
+train_pred = predict(svm_radial, OJ_train)
+table(OJ_train$Purchase, train_pred)
+(47+82)/(438+233+47+82)
+```
+The training error rate is 16.125%
+
+```{r}
+test_pred = predict(svm_radial, OJ_test)
+table(OJ_test$Purchase, test_pred)
+(15+30)/(153+72+15+30)
+```
+
+The test error rate is 16.67%
+
+```{r}
+set.seed(10)
+tune_out = tune(svm, Purchase ~ ., data = OJ_train, kernel = "radial", ranges = list(cost = 10^seq(-2, 1, by = 0.25)))
+#summary(tune_out)
+svm_radial = svm(Purchase ~ ., data = OJ_train, kernel = "radial", cost = tune_out$best.parameters$cost)
+train_pred = predict(svm_radial, OJ_train)
+table(OJ_train$Purchase, train_pred)
+(41+74)/(41+74+444+241)
+```
+The training error rate after tuning is 14.375%
+
+```{r}
+test_pred = predict(svm_radial, OJ_test)
+table(OJ_test$Purchase, test_pred)
+(16+30)/(152+72+16+30)
+```
+The test rate after tuning is 17%
+
+### part g
+
+```{r}
+set.seed(11)
+svm_poly = svm(Purchase ~ ., data = OJ_train, kernel = "poly", degree = 2)
+summary(svm_poly)
+```
+
+Support vector classifier with radial kernel creates 441 support vectors from  800 training points. In the rest of points, 183 belong to level CH and 223 belong to level 218
+
+```{r}
+train_pred = predict(svm_poly, OJ_train)
+table(OJ_train$Purchase, train_pred)
+(36+111)/(36+111+449+204)
+```
+The training error rate is 18.375%
+
+```{r}
+test_pred = predict(svm_poly, OJ_test)
+table(OJ_test$Purchase, test_pred)
+(10+41)/(10+41+158+61)
+```
+
+The test error rate is 18.89%
+
+```{r}
+set.seed(12)
+tune_out = tune(svm, Purchase ~ ., data = OJ_train, kernel = "poly", degree = 2, ranges = list(cost = 10^seq(-2, 1, by = 0.25)))
+#summary(tune_out)
+svm_poly = svm(Purchase ~ ., data = OJ_train, kernel = "poly", cost = tune_out$best.parameters$cost)
+train_pred = predict(svm_poly, OJ_train)
+table(OJ_train$Purchase, train_pred)
+(39+80)/(39+80+446+235)
+```
+The training error rate after tuning is 14.875%
+
+```{r}
+test_pred = predict(svm_poly, OJ_test)
+table(OJ_test$Purchase, test_pred)
+(12+32)/(12+32+156+70)
+```
+The test rate after tuning is 16.3%
+
+### part h
+
+With linear kernel, the training error rate after tuning is 16.375% and the test error rate after tuing is 15.56%
+
+With radial kernel, the training error rate after tuning is 14.375% and the test error rate after tuing is 17%
+
+With polynomial kernel, the training error rate after tuning is 14.875% and the test error rate after tuing is 16.3%
+
+Suprisingly, on this data, linear kernel has smaller test error rate.
+
